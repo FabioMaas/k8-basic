@@ -1,0 +1,15 @@
+# kubeadm-config.yaml
+kind: InitConfiguration
+apiVersion: kubeadm.k8s.io/v1beta3
+nodeRegistration:
+  criSocket: unix:///var/run/cri-dockerd.sock
+---
+kind: ClusterConfiguration
+apiVersion: kubeadm.k8s.io/v1beta3
+kubernetesVersion: v1.29.0
+networking:
+  podSubnet: "192.168.0.0/16" # --pod-network-cidr  Calico
+---
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: systemd
