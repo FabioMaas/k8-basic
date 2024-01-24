@@ -21,22 +21,54 @@ init_all(){
 
     echo "Install Tools..."
     sudo apt-get update
-    sudo apt-get install -y kubelet kubeadm kubectl
-    sudo apt-mark hold kubelet kubeadm kubectl
+
+    package_name=kubelet
+    if is_package_installed "$package_name"; then
+        echo "Package $package_name is already installed."
+    else
+        echo "Install $package_name."
+        sudo apt-get install $package_name -y
+        sudo apt-mark hold $package_name -y
+    fi
+
+    package_name=kubeadm
+    if is_package_installed "$package_name"; then
+        echo "Package $package_name is already installed."
+    else
+        echo "Install $package_name."
+        sudo apt-get install $package_name -y
+        sudo apt-mark hold $package_name -y
+    fi
+
+    package_name=kubectl
+    if is_package_installed "$package_name"; then
+        echo "Package $package_name is already installed."
+    else
+        echo "Install $package_name."
+        sudo apt-get install $package_name -y
+        sudo apt-mark hold $package_name -y
+    fi
 
     setup_network
 
-    if command -v docker &> /dev/null; then
-        echo "Docker is already installed."
+    package_name=docker
+    if is_package_installed "$package_name"; then
+        echo "Package $package_name is already installed."
     else
-        install_docker    
+        install_docker
     fi
     
-    echo "Get cri-dockerd for container runtime..."
-    sudo wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.9/cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb
 
-    echo "Install cri-dockerd..."
-    sudo dpkg -i cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb    
+    package_name=cri-dockerd
+    if is_package_installed "$package_name"; then
+        echo "Package $package_name is already installed."
+    else
+        echo "Get cri-dockerd for container runtime..."
+        sudo wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.9/cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb
+
+        echo "Install cri-dockerd..."
+        sudo dpkg -i cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb  
+    fi
 
     echo "[Installation complete]"
     wait 4
@@ -49,20 +81,7 @@ init_all(){
     sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
     sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-    echo "==== Setup Calico as CNI ===="
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml
-
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml
-
-    echo "Wait for calico-system..."
-    wait 10
-    kubectl wait --for=condition=Ready pod --all -n calico-system
-
-    echo "Taint nodes..."
-    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
-    kubectl taint nodes --all node-role.kubernetes.io/master-
-
-
+    install_calico
     kubectl get nodes -o wide
     echo "[DONE: Your cluster is ready! ]"
 }
@@ -82,6 +101,21 @@ install_docker(){
     sudo apt-get update
 
     sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+}
+
+install_calico(){
+    echo "==== Setup Calico as CNI ===="
+    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml
+
+    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml
+
+    echo "Wait for calico-system..."
+    wait 10
+    kubectl wait --for=condition=Ready pod --all -n calico-system
+
+    echo "Taint nodes..."
+    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+    kubectl taint nodes --all node-role.kubernetes.io/master-
 }
 
 if [ "$#" -ne 1 ]; then
@@ -108,6 +142,16 @@ case "$argument" in
 esac
 
 
+
+is_package_installed() {
+    dpkg -s $1 &> /dev/null
+
+    if [ $? -eq 0 ]; then
+        return 0  # Package is installed
+    else
+        return 1  # Package is not installed
+    fi
+}
 
 setup_network() {
     echo "Setup host for networking..."
