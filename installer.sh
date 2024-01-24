@@ -24,8 +24,6 @@ init_all(){
     sudo apt-get install -y kubelet kubeadm kubectl
     sudo apt-mark hold kubelet kubeadm kubectl
 
-    setup_network
-
     install_docker    
 
     echo "Get cri-dockerd for container runtime..."
@@ -50,9 +48,14 @@ init_all(){
 
     kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml
 
-    echo "Wait for calico-system..."
-    sleep 10
-    kubectl wait --for=condition=Ready pod --all -n calico-system
+    sleep 1
+    while [ "$(kubectl get pods --field-selector=status.phase=Running -n calico-system | grep -c 'calico\|csi')" != 4 ]
+
+        do
+            sleep 5
+            echo "Wait for calico-system..."
+        done
+
 
     echo "Taint nodes..."
     kubectl taint nodes --all node-role.kubernetes.io/control-plane-
@@ -87,14 +90,9 @@ fi
 
 argument="$1"
 
-
-
 case "$argument" in
     "init")
         init_all
-        ;;
-    "uninstall")
-        uninstall_all
         ;;
     *)
         echo "Unknown argument: $argument"
@@ -102,26 +100,3 @@ case "$argument" in
         exit 1
         ;;
 esac
-
-
-
-setup_network() {
-    echo "Setup host for networking..."
-    cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
-    overlay
-    br_netfilter
-    EOF
-
-    sudo modprobe overlay
-    sudo modprobe br_netfilter
-
-    # sysctl params required by setup, params persist across reboots
-    cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-    net.bridge.bridge-nf-call-iptables  = 1
-    net.bridge.bridge-nf-call-ip6tables = 1
-    net.ipv4.ip_forward                 = 1
-    EOF
-
-    # Apply sysctl params without reboot
-    sudo sysctl --system 
-}
