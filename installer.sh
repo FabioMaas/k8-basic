@@ -11,7 +11,7 @@ fi
 init_all(){
     echo "==== Install Kubernetes Workload ===="
     sudo apt-get update
-    sudo mldir -p /etc/apt/keyrings
+    sudo mkdir -p /etc/apt/keyrings
     sudo apt-get install -y apt-transport-https ca-certificates curl gpg
 
     sudo mkdir -p -m 755 /etc/apt/keyrings
