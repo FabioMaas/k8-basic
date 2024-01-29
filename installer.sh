@@ -9,6 +9,37 @@ else
 fi
 
 init_all(){
+
+    install_kubeworkload
+    install_docker     
+    install_cri_dockerd
+
+    echo "[Installation complete]"
+    wait 4
+
+    echo "==== Initialize cluster ===="
+    sudo kubeadm init --config=kubeadm-config.yaml
+
+    echo "Prepare KUBECONFIG location..."
+    mkdir -p $HOME/.kube
+    sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    install_cni_calico
+
+    kubectl get nodes -o wide
+    echo "[DONE: Your cluster is ready! ]"
+}
+
+install_cri_dockerd(){
+    echo "Get cri-dockerd for container runtime..."
+    sudo wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.9/cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb
+
+    echo "Install cri-dockerd..."
+    sudo dpkg -i cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb   
+}
+
+install_kubeworkload(){
     echo "==== Install Kubernetes Workload ===="
     sudo apt-get update
     sudo mkdir -p /etc/apt/keyrings
@@ -23,47 +54,6 @@ init_all(){
     sudo apt-get update
     sudo apt-get install -y kubelet kubeadm kubectl
     sudo apt-mark hold kubelet kubeadm kubectl
-
-    install_docker    
-
-    echo "Get cri-dockerd for container runtime..."
-    sudo wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.9/cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb
-
-    echo "Install cri-dockerd..."
-    sudo dpkg -i cri-dockerd_0.3.9.3-0.ubuntu-$(lsb_release -c -s)_amd64.deb    
-
-    echo "[Installation complete]"
-    wait 4
-
-    echo "==== Initialize cluster ===="
-    sudo kubeadm init --config=kubeadm-config.yaml
-
-    echo "Prepare KUBECONFIG location..."
-    mkdir -p $HOME/.kube
-    sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-    sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-    echo "==== Setup Calico as CNI ===="
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml
-
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml
-
-    sleep 1
-    while [ "$(kubectl get pods --field-selector=status.phase=Running -n calico-system | grep -c 'calico\|csi')" != 4 ]
-
-        do
-            sleep 5
-            echo "Wait for calico-system..."
-        done
-
-
-    echo "Taint nodes..."
-    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
-    kubectl taint nodes --all node-role.kubernetes.io/master-
-
-
-    kubectl get nodes -o wide
-    echo "[DONE: Your cluster is ready! ]"
 }
 
 install_docker(){
@@ -83,6 +73,37 @@ install_docker(){
     sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 }
 
+install_cni_calico(){
+    echo "==== Setup Calico as CNI ===="
+    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml
+
+    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml
+
+    sleep 1
+    echo "Wait until calico-system is running."
+    while [ "$(kubectl get pods --field-selector=status.phase=Running -n calico-system | grep -c 'calico\|csi')" != 4 ]
+
+        do
+            sleep 5
+            echo "Wait for calico-system..."
+        done
+
+
+    echo "Taint nodes..."
+    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+    kubectl taint nodes --all node-role.kubernetes.io/master-
+}
+
+install_helm(){
+    echo "==== Install Helm ===="
+    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    chmod 700 get_helm.sh
+    ./get_helm.sh
+    sudo rm get_helm.sh
+    echo "[ Helm installed ]"
+}
+
+# arguments
 if [ "$#" -ne 1 ]; then
     echo "Usage like: $0 <argument>"
     exit 1
