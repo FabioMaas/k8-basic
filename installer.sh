@@ -15,7 +15,7 @@ init_all(){
     install_cri_dockerd
 
     echo "[Installation complete]"
-    wait 4
+    sleep 4
 
     echo "==== Initialize cluster ===="
     sudo kubeadm init --config=kubeadm-config.yaml
@@ -27,6 +27,10 @@ init_all(){
 
     install_cni_calico
     install_helm
+
+    sleep 2
+    echo "Continue with load balancer..."
+    install_chart_nginx
 
     kubectl get nodes -o wide
     echo "[DONE: Your cluster is ready! ]"
@@ -114,6 +118,14 @@ install_metallb(){
 
     kubectl apply -f metallb-config.yaml
     echo "[ Metallb installed ]"
+}
+
+#Helm charts
+install_chart_nginx(){
+    echo "==== Install Ingress Nginx ===="
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm repo update
+    helm upgrade ingress-nginx ingress-nginx/ingress-nginx --install --create-namespace -n ingress-nginx --atomic --version 4.9.1
 }
 
 # arguments
