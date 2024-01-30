@@ -26,6 +26,7 @@ init_all(){
     sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
     install_cni_calico
+    install_helm
 
     kubectl get nodes -o wide
     echo "[DONE: Your cluster is ready! ]"
