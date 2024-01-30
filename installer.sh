@@ -103,6 +103,18 @@ install_helm(){
     echo "[ Helm installed ]"
 }
 
+install_metallb(){
+    echo "==== Install Metallb ===="
+    kubectl get configmap kube-proxy -n kube-system -o yaml | \
+    sed -e "s/strictARP: false/strictARP: true/" | \
+    kubectl apply -f - -n kube-system
+
+    kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.2/config/manifests/metallb-frr.yaml
+
+    kubectl apply -f metallb-config.yaml
+    echo "[ Metallb installed ]"
+}
+
 # arguments
 if [ "$#" -ne 1 ]; then
     echo "Usage like: $0 <argument>"
